@@ -1,0 +1,17 @@
+{
+  "port": 8080,
+  "keys": {
+    "UP": "up",
+    "DOWN": "down",
+    "LEFT": "left",
+    "RIGHT": "right",
+    "A": "z",
+    "B": "x",
+    "X": "a",
+    "Y": "s",
+    "L": "q",
+    "R": "w",
+    "START": "enter",
+    "SELECT": "shift"
+  }
+}

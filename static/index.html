@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#14161c">
+<title>Phone Gamepad</title>
+<style>
+  :root {
+    --bg: #14161c;
+    --pad: #232733;
+    --btn: #2f3442;
+    --btn-on: #5b8cff;
+    --text: #e8ebf2;
+    --muted: #8b92a5;
+    --a: #3fbf7f; --b: #e5484d; --x: #3e8ef7; --y: #f5b83d;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; touch-action: none; overscroll-behavior: none; }
+
+  .pad { position: fixed; inset: 0; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
+    padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+  .side { position: relative; height: 100%; display: flex; align-items: center; justify-content: center; }
+
+  .shoulder { position: absolute; top: 0; width: 42%; height: 15%; min-height: 40px; border-radius: 14px;
+    background: var(--btn); display: grid; place-items: center; font-weight: 700; color: var(--muted); }
+  .left .shoulder { left: 0; } .right .shoulder { right: 0; }
+
+  /* D-pad: one element, direction worked out from touch angle so diagonals work. */
+  .dpad { position: relative; width: min(42vh, 40vw); aspect-ratio: 1; }
+  .dpad .arm { position: absolute; background: var(--btn); border-radius: 10px; }
+  .dpad .arm.on { background: var(--btn-on); }
+  .arm.UP    { left: 33%; top: 0;     width: 34%; height: 38%; }
+  .arm.DOWN  { left: 33%; bottom: 0;  width: 34%; height: 38%; }
+  .arm.LEFT  { top: 33%;  left: 0;    width: 38%; height: 34%; }
+  .arm.RIGHT { top: 33%;  right: 0;   width: 38%; height: 34%; }
+  .dpad .hub { position: absolute; left: 30%; top: 30%; width: 40%; height: 40%; background: var(--btn); border-radius: 8px; }
+
+  .face { position: relative; width: min(44vh, 40vw); aspect-ratio: 1; }
+  .face .btn { position: absolute; width: 36%; aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center;
+    font-size: min(6vh, 5vw); font-weight: 800; background: var(--btn); border: 3px solid currentColor; }
+  .face .btn.on { background: currentColor; }
+  .face .btn.on span { color: var(--bg); }
+  .btn[data-b="Y"] { left: 32%; top: 0;    color: var(--y); }
+  .btn[data-b="A"] { left: 32%; bottom: 0; color: var(--a); }
+  .btn[data-b="X"] { left: 0;   top: 32%;  color: var(--x); }
+  .btn[data-b="B"] { right: 0;  top: 32%;  color: var(--b); }
+
+  .center { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 0 10px; }
+  .row { display: flex; gap: 12px; }
+  .pill { padding: 10px 16px; border-radius: 999px; background: var(--btn); font-size: 12px; font-weight: 700; letter-spacing: .06em; color: var(--muted); }
+  .pill.on, .shoulder.on { background: var(--btn-on); color: var(--text); }
+  .status { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--b); }
+  .dot.ok { background: var(--a); }
+  .fs { background: none; border: 1px solid var(--btn); color: var(--muted); border-radius: 8px; padding: 6px 10px; font-size: 12px; }
+
+  .rotate { display: none; position: fixed; inset: 0; background: var(--bg); place-items: center; text-align: center; padding: 24px; font-size: 18px; }
+  @media (orientation: portrait) { .rotate { display: grid; } }
+</style>
+</head>
+<body>
+<div class="pad">
+  <div class="side left">
+    <div class="shoulder" data-b="L">L</div>
+    <div class="dpad" id="dpad">
+      <div class="arm UP"></div><div class="arm DOWN"></div>
+      <div class="arm LEFT"></div><div class="arm RIGHT"></div>
+      <div class="hub"></div>
+    </div>
+  </div>
+
+  <div class="center">
+    <div class="status"><span class="dot" id="dot"></span><span id="statusText">Connecting…</span></div>
+    <div class="row">
+      <div class="pill" data-b="SELECT">SELECT</div>
+      <div class="pill" data-b="START">START</div>
+    </div>
+    <button class="fs" id="fs">Full screen</button>
+  </div>
+
+  <div class="side right">
+    <div class="shoulder" data-b="R">R</div>
+    <div class="face">
+      <div class="btn" data-b="Y"><span>Y</span></div>
+      <div class="btn" data-b="X"><span>X</span></div>
+      <div class="btn" data-b="B"><span>B</span></div>
+      <div class="btn" data-b="A"><span>A</span></div>
+    </div>
+  </div>
+</div>
+<div class="rotate">Turn your phone sideways to play 📱↻</div>
+
+<script>
+(() => {
+  const dot = document.getElementById('dot');
+  const statusText = document.getElementById('statusText');
+  const dpad = document.getElementById('dpad');
+  let ws = null;
+  let pressed = new Set();
+
+  function connect() {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    ws = new WebSocket(`${proto}://${location.host}/ws`);
+    ws.onopen = () => { dot.classList.add('ok'); statusText.textContent = 'Connected'; };
+    ws.onclose = () => {
+      dot.classList.remove('ok'); statusText.textContent = 'Reconnecting…';
+      setPressed(new Set(), false);  // server releases keys on its side
+      setTimeout(connect, 1000);
+    };
+  }
+
+  function send(t, b) {
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ t, b }));
+  }
+
+  // Which D-pad directions a point on the pad means (8-way, with a dead zone).
+  function dpadDirs(x, y) {
+    const r = dpad.getBoundingClientRect();
+    const dx = (x - (r.left + r.width / 2)) / (r.width / 2);
+    const dy = (y - (r.top + r.height / 2)) / (r.height / 2);
+    if (Math.hypot(dx, dy) < 0.2 || Math.hypot(dx, dy) > 1.6) return [];
+    const angle = Math.atan2(-dy, dx) * 180 / Math.PI;   // 0 = right, 90 = up
+    const dirs = [];
+    if (angle > 22.5 && angle < 157.5) dirs.push('UP');
+    if (angle < -22.5 && angle > -157.5) dirs.push('DOWN');
+    if (angle > 112.5 || angle < -112.5) dirs.push('LEFT');
+    if (angle < 67.5 && angle > -67.5) dirs.push('RIGHT');
+    return dirs;
+  }
+
+  // Work out every button under every finger. Sliding a finger from one
+  // button to another works, and several fingers can hold buttons at once.
+  function buttonsAt(touches) {
+    const out = new Set();
+    for (const t of touches) {
+      const r = dpad.getBoundingClientRect();
+      const pad = 0.3 * r.width;  // a little forgiveness around the D-pad
+      if (t.clientX > r.left - pad && t.clientX < r.right + pad &&
+          t.clientY > r.top - pad && t.clientY < r.bottom + pad) {
+        dpadDirs(t.clientX, t.clientY).forEach(d => out.add(d));
+        continue;
+      }
+      const el = document.elementFromPoint(t.clientX, t.clientY);
+      const btn = el && el.closest('[data-b]');
+      if (btn) out.add(btn.dataset.b);
+    }
+    return out;
+  }
+
+  function setPressed(next, notify = true) {
+    for (const b of pressed) if (!next.has(b)) { if (notify) send('up', b); mark(b, false); }
+    for (const b of next) if (!pressed.has(b)) {
+      if (notify) send('down', b);
+      mark(b, true);
+      if (navigator.vibrate) navigator.vibrate(12);
+    }
+    pressed = next;
+  }
+
+  function mark(b, on) {
+    document.querySelectorAll(`[data-b="${b}"], .arm.${b}`).forEach(el => el.classList.toggle('on', on));
+  }
+
+  const onTouch = e => { e.preventDefault(); setPressed(buttonsAt(e.touches)); };
+  for (const type of ['touchstart', 'touchmove', 'touchend', 'touchcancel']) {
+    document.addEventListener(type, onTouch, { passive: false });
+  }
+
+  // Mouse fallback so the page can be tried on a computer too.
+  let mouseDown = false;
+  document.addEventListener('mousedown', e => { mouseDown = true; setPressed(buttonsAt([e])); });
+  document.addEventListener('mousemove', e => { if (mouseDown) setPressed(buttonsAt([e])); });
+  document.addEventListener('mouseup', () => { mouseDown = false; setPressed(new Set()); });
+
+  // If the phone screen locks or the tab is hidden, let go of everything.
+  document.addEventListener('visibilitychange', () => { if (document.hidden) setPressed(new Set()); });
+
+  const fsBtn = document.getElementById('fs');
+  fsBtn.addEventListener('touchend', e => { e.stopPropagation(); goFullscreen(); });
+  fsBtn.addEventListener('click', goFullscreen);
+  function goFullscreen() {
+    const el = document.documentElement;
+    (el.requestFullscreen || el.webkitRequestFullscreen || (() => {})).call(el);
+    if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {});
+  }
+
+  connect();
+})();
+</script>
+</body>
+</html>
