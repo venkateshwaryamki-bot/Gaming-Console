@@ -18,6 +18,12 @@ key press on the laptop. It works with **any game that can be played with a keyb
    pip install -r requirements.txt
    ```
 
+## Easiest way (Windows)
+
+1. On this GitHub page click the green **Code** button, then **Download ZIP**, and extract it.
+2. Open the extracted folder and double-click **Start Gaming Console**.
+3. Scan the QR code it shows with your phone (same Wi-Fi).
+
 ## Play
 
 1. Make sure your phone and laptop are on the **same Wi-Fi network**.
